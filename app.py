@@ -178,6 +178,17 @@ def users_followers(user_id):
     user = User.query.get_or_404(user_id)
     return render_template('users/followers.html', user=user)
 
+@app.route('/users/<int:user_id>/likes')
+def users_likes(user_id):
+    """Show list of warbles liked by this user"""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    user = User.query.get_or_404(user_id)
+    return render_template('users/likes.html', user=user)
+
 
 @app.route('/users/follow/<int:follow_id>', methods=['POST'])
 def add_follow(follow_id):
@@ -207,6 +218,27 @@ def stop_following(follow_id):
     db.session.commit()
 
     return redirect(f"/users/{g.user.id}/following")
+
+@app.route('/users/add-like/<int:msg_id>', methods=['POST'])
+def toggle_like(msg_id):
+    """Toggle whether current user likes specified message."""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+    
+    message = Message.query.get_or_404(msg_id)
+    if message in g.user.likes:
+        flash('Message unliked', 'secondary')
+        g.user.likes.remove(message)
+    else:
+        flash('Message liked', 'success')
+        g.user.likes.append(message)
+    db.session.commit()
+
+    url_redirect = request.form.get('url-redirect')
+
+    return redirect(url_redirect)
 
 
 @app.route('/users/profile', methods=["GET", "POST"])
