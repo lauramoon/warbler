@@ -52,7 +52,7 @@ class MessageViewTestCase(TestCase):
         db.session.commit()
 
     def test_add_message(self):
-        """Can use add a message?"""
+        """Can user add a message?"""
 
         # Since we need to change the session to mimic logging in,
         # we need to use the changing-session trick:
@@ -71,3 +71,156 @@ class MessageViewTestCase(TestCase):
 
             msg = Message.query.one()
             self.assertEqual(msg.text, "Hello")
+            self.assertEqual(msg.user_id, self.testuser.id)
+
+    def test_add_message_redirect(self):
+        """After adding a message, what happens?"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            resp = c.post("/messages/new", data={"text": "Hello"}, follow_redirects=True)
+            html = resp.get_data(as_text=True)
+
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('<a href="/users/profile" class="btn btn-outline-secondary">Edit Profile</a>', html)
+            self.assertIn(f'<h4 id="sidebar-username">@{self.testuser.username}</h4>', html)
+            self.assertIn('<p>Hello</p>', html)
+
+    def test_add_message_loggedout(self):
+        """Test that no message added if no logged-in user"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                if CURR_USER_KEY in sess:
+                    del sess[CURR_USER_KEY]
+
+            resp = c.post("/messages/new", data={"text": "Hello"})
+            self.assertEqual(resp.status_code, 302)
+
+            msgs = Message.query.all()
+            self.assertEqual(len(msgs), 0)
+
+    def test_add_message_loggedout_redirect(self):
+        """Test that attempt to add message if not logged in leads to homepage with flash msg"""
+        
+        with self.client as c:
+            with c.session_transaction() as sess:
+                if CURR_USER_KEY in sess:
+                    del sess[CURR_USER_KEY]
+
+            resp = c.post("/messages/new", data={"text": "Hello"}, follow_redirects=True)
+            html = resp.get_data(as_text=True)
+
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('<p>Sign up now to get your own personalized timeline!</p>', html)
+            self.assertIn('<div class="alert alert-danger">Access unauthorized.</div>', html)
+
+    def test_view_message(self):
+        """Test view message"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            # Add test message to display
+            m = Message(text="Test message", user_id=self.testuser.id)
+            db.session.add(m)
+            db.session.commit()
+            
+            resp = c.get(f'/messages/{m.id}')
+            html = resp.get_data(as_text=True)
+
+            self.assertEqual(resp.status_code, 200)
+
+            # Logged-in user viewing own message has delete option
+            self.assertIn('<button class="btn btn-outline-danger">Delete</button>', html)
+            self.assertIn('<p class="single-message">Test message</p>', html)
+
+    def test_delete_message_success(self):
+        """Test successfully deleting message"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            # Add test message to delete
+            m = Message(text="Test message", user_id=self.testuser.id)
+            db.session.add(m)
+            db.session.commit()
+
+            resp = c.post(f'/messages/{m.id}/delete')
+            
+            self.assertEqual(resp.status_code, 302)
+            
+            msgs = Message.query.all()
+            self.assertEqual(len(msgs), 0)
+
+    def test_delete_message_success_redirect(self):
+        """Test successfully deleting message"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            # Add test message to delete
+            m = Message(text="Test message", user_id=self.testuser.id)
+            db.session.add(m)
+            db.session.commit()
+
+            resp = c.post(f'/messages/{m.id}/delete', follow_redirects=True)
+            html = resp.get_data(as_text=True)
+            
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('<a href="/users/profile" class="btn btn-outline-secondary">Edit Profile</a>', html)
+            self.assertIn(f'<h4 id="sidebar-username">@{self.testuser.username}</h4>', html)
+            self.assertNotIn('<p>Hello</p>', html)
+
+    def test_delete_message_fail(self):
+        """Test message not deleted if user not signed in"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            # Add test message to try to delete
+            m = Message(text="Test message", user_id=self.testuser.id)
+            db.session.add(m)
+            db.session.commit()
+            
+            # log out current user
+            with c.session_transaction() as sess:
+                del sess[CURR_USER_KEY]            
+
+            m = Message.query.all()[0]
+            resp = c.post(f'/messages/{m.id}/delete')
+            
+            self.assertEqual(resp.status_code, 302)
+            
+            msgs = Message.query.all()
+            self.assertEqual(len(msgs), 1)
+
+    def test_delete_message_fail_redirect(self):
+        """Test redirect to home on delete attempt if user not signed in"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            # Add test message to try to delete
+            m = Message(text="Test message", user_id=self.testuser.id)
+            db.session.add(m)
+            db.session.commit()
+            
+            # log out current user
+            with c.session_transaction() as sess:
+                del sess[CURR_USER_KEY]            
+
+            m = Message.query.all()[0]
+            resp = c.post(f'/messages/{m.id}/delete', follow_redirects=True)
+            html = resp.get_data(as_text=True)
+            
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('<p>Sign up now to get your own personalized timeline!</p>', html)
+            self.assertIn('<div class="alert alert-danger">Access unauthorized.</div>', html)

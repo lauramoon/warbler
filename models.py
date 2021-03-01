@@ -4,6 +4,7 @@ from datetime import datetime
 
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import backref
 
 bcrypt = Bcrypt()
 db = SQLAlchemy()
@@ -112,7 +113,8 @@ class User(db.Model):
 
     likes = db.relationship(
         'Message',
-        secondary="likes"
+        secondary="likes",
+        backref='liked_by'
     )
 
     def __repr__(self):

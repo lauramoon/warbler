@@ -1,9 +1,13 @@
+{% import 'macros.html' as macros %}
+
 {% extends 'users/detail.html' %}
 {% block user_details %}
   <div class="col-sm-6">
     <ul class="list-group" id="messages">
 
-      {% for message in user.likes %}
+      {{ macros.message_list(user.likes, '/users/' ~ user.id ~ '/likes') }}
+
+      <!-- {% for message in user.likes %}
 
         <li class="list-group-item">
           <a href="/messages/{{ message.id }}" class="message-link"/>
@@ -35,7 +39,7 @@
             {% endif %}
         </li>
 
-      {% endfor %}
+      {% endfor %} -->
 
     </ul>
   </div>
