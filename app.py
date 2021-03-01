@@ -1,4 +1,5 @@
 import os
+from functools import wraps
 
 from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
@@ -51,6 +52,16 @@ def do_logout():
 
     if CURR_USER_KEY in session:
         del session[CURR_USER_KEY]
+
+def checkuser(func):
+    """Wrapper function checks if user logged in else redirects to home with flash warning"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not g.user:
+            flash("Access unauthorized.", "danger")
+            return redirect("/")
+        return func(*args, **kwargs)
+    return wrapper
 
 
 @app.route('/signup', methods=["GET", "POST"])
@@ -154,49 +165,37 @@ def users_show(user_id):
                 .all())
     return render_template('users/show.html', user=user, messages=messages)
 
-
 @app.route('/users/<int:user_id>/following')
+@checkuser
 def show_following(user_id):
     """Show list of people this user is following."""
-
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
 
     user = User.query.get_or_404(user_id)
     return render_template('users/following.html', user=user)
 
 
 @app.route('/users/<int:user_id>/followers')
+@checkuser
 def users_followers(user_id):
     """Show list of followers of this user."""
-
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
 
     user = User.query.get_or_404(user_id)
     return render_template('users/followers.html', user=user)
 
+
 @app.route('/users/<int:user_id>/likes')
+@checkuser
 def users_likes(user_id):
     """Show list of warbles liked by this user"""
-
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
 
     user = User.query.get_or_404(user_id)
     return render_template('users/likes.html', user=user)
 
 
 @app.route('/users/follow/<int:follow_id>', methods=['POST'])
+@checkuser
 def add_follow(follow_id):
     """Add a follow for the currently-logged-in user."""
-
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
 
     followed_user = User.query.get_or_404(follow_id)
     g.user.following.append(followed_user)
@@ -206,12 +205,9 @@ def add_follow(follow_id):
 
 
 @app.route('/users/stop-following/<int:follow_id>', methods=['POST'])
+@checkuser
 def stop_following(follow_id):
     """Have currently-logged-in-user stop following this user."""
-
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
 
     followed_user = User.query.get(follow_id)
     g.user.following.remove(followed_user)
@@ -219,13 +215,11 @@ def stop_following(follow_id):
 
     return redirect(f"/users/{g.user.id}/following")
 
+
 @app.route('/users/add-like/<int:msg_id>', methods=['POST'])
+@checkuser
 def toggle_like(msg_id):
     """Toggle whether current user likes specified message."""
-
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
     
     message = Message.query.get_or_404(msg_id)
     if message in g.user.likes:
@@ -242,6 +236,7 @@ def toggle_like(msg_id):
 
 
 @app.route('/users/profile', methods=["GET", "POST"])
+@checkuser
 def profile():
     """Update profile for current user."""
 
@@ -270,12 +265,9 @@ def profile():
     return render_template('/users/edit.html', form=form)
 
 @app.route('/users/delete', methods=["POST"])
+@checkuser
 def delete_user():
     """Delete user."""
-
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
 
     do_logout()
 
@@ -289,15 +281,12 @@ def delete_user():
 # Messages routes:
 
 @app.route('/messages/new', methods=["GET", "POST"])
+@checkuser
 def messages_add():
     """Add a message:
 
     Show form if GET. If valid, update message and redirect to user page.
     """
-
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
 
     form = MessageForm()
 
@@ -312,6 +301,7 @@ def messages_add():
 
 
 @app.route('/messages/<int:message_id>', methods=["GET"])
+@checkuser
 def messages_show(message_id):
     """Show a message."""
 
@@ -320,12 +310,9 @@ def messages_show(message_id):
 
 
 @app.route('/messages/<int:message_id>/delete', methods=["POST"])
+@checkuser
 def messages_destroy(message_id):
     """Delete a message."""
-
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
 
     msg = Message.query.get(message_id)
     db.session.delete(msg)
