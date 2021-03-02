@@ -1,3 +1,5 @@
+{% import 'macros.html' as macros %}
+
 {% extends 'base.html' %}
 
 {% block content %}
@@ -15,24 +17,31 @@
               <a href="/users/{{ message.user.id }}">@{{ message.user.username }}</a>
               {% if g.user %}
                 {% if g.user.id == message.user.id %}
-                  <form method="POST"
-                        action="/messages/{{ message.id }}/delete">
-                    <button class="btn btn-outline-danger">Delete</button>
-                  </form>
-                {% elif g.user.is_following(message.user) %}
-                  <form method="POST"
-                        action="/users/stop-following/{{ message.user.id }}">
-                    <button class="btn btn-primary">Unfollow</button>
-                  </form>
+                <form method="POST"
+                    action="/messages/{{ message.id }}/delete">
+                  <button class="btn btn-outline-danger">Delete</button>
+                </form>
                 {% else %}
-                  <form method="POST" action="/users/follow/{{ message.user.id }}">
-                    <button class="btn btn-outline-primary btn-sm">Follow</button>
-                  </form>
+
+                {{ macros.follow_unfollow_button(message.user, '/messages/' ~ message.id) }}
+
                 {% endif %}
+
               {% endif %}
+              
             </div>
             <p class="single-message">{{ message.text }}</p>
-            <span class="text-muted">{{ message.timestamp.strftime('%d %B %Y') }}</span>
+            <div class="row mb-3 mr-1">
+              <div class="col-6">
+                <span class="text-muted">{{ message.timestamp.strftime('%d %B %Y') }}</span>
+              </div>
+              <div class="col-6">
+                {{ macros.like_button(message, '/messages/' ~ message.id) }}
+              </div>
+            </div>
+            
+
+            
           </div>
         </li>
       </ul>

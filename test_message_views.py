@@ -28,6 +28,13 @@ from app import app, CURR_USER_KEY
 
 db.create_all()
 
+# Data for creating other user
+USER_DATA = {
+    "email": "newtest@test.com",
+    "username": "testnewuser",
+    "password": "password",
+    "image_url": "static/images/test.png"}
+
 # Don't have WTForms use CSRF at all, since it's a pain to test
 
 app.config['WTF_CSRF_ENABLED'] = False
@@ -118,7 +125,7 @@ class MessageViewTestCase(TestCase):
             self.assertIn('<div class="alert alert-danger">Access unauthorized.</div>', html)
 
     def test_view_message(self):
-        """Test view message"""
+        """Test view own message"""
 
         with self.client as c:
             with c.session_transaction() as sess:
@@ -134,9 +141,43 @@ class MessageViewTestCase(TestCase):
 
             self.assertEqual(resp.status_code, 200)
 
-            # Logged-in user viewing own message has delete option
+            # Logged-in user viewing own message has delete option, no follow or like options
             self.assertIn('<button class="btn btn-outline-danger">Delete</button>', html)
             self.assertIn('<p class="single-message">Test message</p>', html)
+            self.assertNotIn('<button class="btn btn-primary btn-sm">Unfollow</button>', html)
+            self.assertNotIn('<button class="btn btn-outline-primary btn-sm">Follow</button>', html)
+            self.assertNotIn('<form method="POST" action="/users/add-like/', html)
+
+
+    def test_view_other_user_message(self):
+        """Test view other user's message"""
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            # add other user
+            other_user = User(**USER_DATA)
+            db.session.add(other_user)
+            db.session.commit()
+
+            # Add test message to display
+            m = Message(text="Test message", user_id=other_user.id)
+            db.session.add(m)
+            db.session.commit()
+            
+            resp = c.get(f'/messages/{m.id}')
+            html = resp.get_data(as_text=True)
+
+            self.assertEqual(resp.status_code, 200)
+
+            # Logged-in user viewing other unfollowed user's message has no delete option, 
+            # has follow and like options
+            self.assertNotIn('<button class="btn btn-outline-danger">Delete</button>', html)
+            self.assertIn('<p class="single-message">Test message</p>', html)
+            self.assertNotIn('<button class="btn btn-primary btn-sm">Unfollow</button>', html)
+            self.assertIn('<button class="btn btn-outline-primary btn-sm">Follow</button>', html)
+            self.assertIn('<form method="POST" action="/users/add-like/', html)
+
 
     def test_delete_message_success(self):
         """Test successfully deleting message"""
@@ -158,7 +199,7 @@ class MessageViewTestCase(TestCase):
             self.assertEqual(len(msgs), 0)
 
     def test_delete_message_success_redirect(self):
-        """Test successfully deleting message"""
+        """Test successfully deleting message redirect"""
 
         with self.client as c:
             with c.session_transaction() as sess:
