@@ -7,7 +7,7 @@
 
       {% for followed_user in user.following %}
 
-      {{ macros.user_card(followed_user) }}
+      {{ macros.user_card(followed_user, '/users/' ~ user.id ~ '/following') }}
 
       {% endfor %}
 

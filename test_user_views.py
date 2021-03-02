@@ -3,9 +3,10 @@
 # For explanatory notes on setup, see comments in test_message_views
 
 import os
+from urllib.parse import urlparse
 from unittest import TestCase
 from models import db, connect_db, Message, User
-from sqlalchemy.exc import IntegrityError, InvalidRequestError
+from flask import jsonify
 
 os.environ['DATABASE_URL'] = "postgresql:///warbler-test"
 
@@ -218,3 +219,103 @@ class UserViewsTestCase(TestCase):
             self.assertEqual(resp.status_code, 200)
             self.assertIn('<p>Sign up now to get your own personalized timeline!</p>', html)
             self.assertIn('<div class="alert alert-danger">Access unauthorized.</div>', html)
+
+    def test_click_follow_on_user_list(self):
+        """Test that clicking 'follow' adds to following and redirects"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            testuser = User.query.filter(User.username=='testuser').one()
+            other_user = User(**USER_DATA)
+            db.session.add(other_user)
+            db.session.commit()
+
+            resp = c.post(f'/users/follow/{other_user.id}', 
+                          data={"url_redirect": "/fake_redirect"})
+            
+            self.assertEqual(resp.status_code, 302)
+            self.assertEqual(urlparse(resp.location).path, "/fake_redirect")
+
+            self.assertIn(other_user, testuser.following)
+            self.assertIn(testuser, other_user.followers)
+
+    def test_click_follow_on_user_list_redirect(self):
+        """Test that clicking 'follow' on '/users' redirects to followed user's page"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            other_user = User(**USER_DATA)
+            db.session.add(other_user)
+            db.session.commit()
+
+            # without the line below, get detached instance error
+            # only needed when follow_redirect=True
+            other_user = User.query.filter(User.username=='testnewuser').one()
+
+            resp = c.post(f'/users/follow/{other_user.id}', 
+                        data={"url_redirect": f"/users/{other_user.id}"}, 
+                        follow_redirects=True)
+            html = resp.get_data(as_text=True)
+            
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('<h4 id="sidebar-username">@testnewuser</h4>', html)
+            self.assertIn('<button class="btn btn-primary btn-sm">Unfollow</button>', html)
+            self.assertNotIn('<button class="btn btn-outline-primary btn-sm">Follow</button>', html)
+
+
+    def test_follow_url_on_user_detail(self):
+        """Check for 'follow' option on user card on different user's following page"""
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            other_user = User(**USER_DATA)
+            other_user_2 = User(**USER_2_DATA)
+            db.session.add_all([other_user, other_user_2])
+            db.session.commit()
+
+            other_user.following.append(other_user_2)
+            db.session.commit()
+
+            url = f'/users/{other_user.id}/following'
+            resp = c.get(url)
+            html = resp.get_data(as_text=True)
+            
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('<h4 id="sidebar-username">@testnewuser</h4>', html)
+            self.assertIn('<p>@test2user</p>', html)
+            self.assertNotIn('<button class="btn btn-primary btn-sm">Unfollow</button>', html)
+            self.assertIn('<button class="btn btn-outline-primary btn-sm">Follow</button>', html)
+            self.assertIn(f'<input type="hidden" name="url_redirect" value="{url}">', html)
+
+
+    def test_click_follow_on_user_detail_redirects(self):
+        """Test click 'follow' on user card on different user's following page 
+        redirects to same page"""
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            other_user = User(**USER_DATA)
+            other_user_2 = User(**USER_2_DATA)
+            db.session.add_all([other_user, other_user_2])
+            db.session.commit()
+
+            other_user.following.append(other_user_2)
+            db.session.commit()
+
+            url = f'/users/{other_user.id}/following'
+            resp = c.post(f'/users/follow/{other_user.id}', 
+                        data={"url_redirect": url}, 
+                        follow_redirects=True)
+            html = resp.get_data(as_text=True)
+            
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('<h4 id="sidebar-username">@testnewuser</h4>', html)
+            self.assertIn('<button class="btn btn-primary btn-sm">Unfollow</button>', html)
+            self.assertIn('<button class="btn btn-outline-primary btn-sm">Follow</button>', html)
+            self.assertIn(f'<input type="hidden" name="url_redirect" value="{url}">', html)

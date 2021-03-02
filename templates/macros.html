@@ -34,7 +34,7 @@
 {% endfor %}
 {%- endmacro %}
 
-{% macro form_fields(form) -%}
+{% macro form_fields(form, redirect_url) -%}
 {{ form.hidden_tag() }}
 
 {% for field in form if field.widget.input_type != 'hidden' %}
@@ -45,7 +45,7 @@
 {% endfor %}
 {%- endmacro %}
 
-{% macro user_card(user) -%}
+{% macro user_card(user, redirect_url) -%}
 <div class="col-lg-4 col-md-6 col-12">
   <div class="card user-card">
     <div class="card-inner">
@@ -59,17 +59,9 @@
         </a>
 
         {% if g.user %}
-          {% if g.user.is_following(user) %}
-            <form method="POST"
-                  action="/users/stop-following/{{ user.id }}">
-              <button class="btn btn-primary btn-sm">Unfollow</button>
-            </form>
-          {% else %}
-            <form method="POST"
-                  action="/users/follow/{{ user.id }}">
-              <button class="btn btn-outline-primary btn-sm">Follow</button>
-            </form>
-          {% endif %}
+
+        {{ follow_unfollow_button(user, redirect_url) }}
+
         {% endif %}
 
       </div>
@@ -77,4 +69,20 @@
     </div>
   </div>
 </div>
+{%- endmacro %}
+
+{% macro follow_unfollow_button(user, redirect_url) -%}
+{% if g.user.is_following(user) %}
+  <form method="POST"
+        action="/users/stop-following/{{ user.id }}">
+    <button class="btn btn-primary btn-sm">Unfollow</button>
+    <input type="hidden" name="url_redirect" value='{{redirect_url}}'>
+  </form>
+{% else %}
+  <form method="POST"
+        action="/users/follow/{{ user.id }}">
+    <button class="btn btn-outline-primary btn-sm">Follow</button>
+    <input type="hidden" name="url_redirect" value="{{redirect_url}}">
+  </form>
+{% endif %}
 {%- endmacro %}

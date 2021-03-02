@@ -1,3 +1,4 @@
+{% import 'macros.html' as macros %}
 {% extends 'base.html' %}
 
 {% block content %}
@@ -42,15 +43,9 @@
               <button class="btn btn-outline-danger ml-2">Delete Profile</button>
             </form>
             {% elif g.user %}
-            {% if g.user.is_following(user) %}
-            <form method="POST" action="/users/stop-following/{{ user.id }}">
-              <button class="btn btn-primary">Unfollow</button>
-            </form>
-            {% else %}
-            <form method="POST" action="/users/follow/{{ user.id }}">
-              <button class="btn btn-outline-primary">Follow</button>
-            </form>
-            {% endif %}
+
+            {{ macros.follow_unfollow_button(user, '/users/' ~ user.id) }}
+
             {% endif %}
           </div>
         </ul>

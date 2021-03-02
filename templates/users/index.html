@@ -11,8 +11,8 @@
 
           {% for user in users %}
 
-          {{ macros.user_card(user) }}
-          
+          {{ macros.user_card(user, '/users/' ~ user.id)}}
+
           {% endfor %}
 
         </div>
