@@ -1,7 +1,7 @@
 ### Warbler
 Warbler is a bare-bones Twitter clone running on Flask with postgreSQL.
 
-To run locally, create a database named 'wabler'. The seed file provides many sample users and messages.
+To run locally, create a database named 'warbler'. The seed file provides many sample users and messages.
 
 This site allows users to post messages, like other users' messages, and follow and unfollow other users. It does not implement private messages, private accounts, user blocking, or admin accounts.
 
